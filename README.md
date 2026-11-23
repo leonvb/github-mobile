@@ -46,6 +46,24 @@ That makes a multi-file commit **atomic** (one commit, not N), and it refuses to
 silently clobber someone else's push: GitHub rejects the ref update if the
 branch moved between step 1 and step 5, and the app surfaces that as an error.
 
+### Empty repositories
+
+A repository with no commits is a special case, because GitHub's Git Data API
+refuses *every* write there with `409 "Git Repository is empty."` — ref reads,
+blobs and trees alike. There is no head to build on, so the usual flow cannot
+start.
+
+The first commit is therefore created through the Contents API, which GitHub
+documents as the way to initialise an empty repository:
+
+```
+PUT /repos/{owner}/{repo}/contents/{path}   → creates the branch + root commit
+```
+
+Everything after that uses the normal Git Data path on top of it. In the app a
+brand-new repository shows a "Brand-new repository" state instead of an error,
+and the first upload or new file becomes the root commit.
+
 ## Setup
 
 ### 1. Create a token
@@ -118,6 +136,10 @@ null-sha deletions):
 - `test/ui-flows.test.mjs` — drives the actual UI: upload folder sheet,
   duplicate-name handling, editor staging with diff stats, committing to a new
   branch, and validation guards.
+- `test/empty-repo.test.mjs` — repositories with no commits. The fake backend
+  reproduces GitHub's real behaviour (409 on refs *and* blobs, 404 on contents),
+  and the suite covers the first commit end to end, from opening the repo to
+  the file landing on the branch.
 
 `npm run inspect` prints the rendered DOM for the welcome, repo and staged
 screens, which is handy when changing markup.
@@ -163,6 +185,9 @@ test/                     jsdom suites + screen inspector
 - **Rate limits** — 5,000 authenticated requests/hour. Each commit uses roughly
   two to four requests per file.
 - **No history view, no PRs, no merges.** This is a commit tool, not a client.
+- **First commit on an empty repo is a Contents API write**, so it carries a
+  single file. Additional files selected alongside it land in a second commit
+  built on top.
 
 ## License
 

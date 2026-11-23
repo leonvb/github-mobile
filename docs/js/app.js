@@ -23,6 +23,7 @@ const state = {
   repo: null,
   branch: '',
   branchIsNew: false,
+  emptyRepo: false,   // repository has no commits at all
   path: '',
   entries: [],
   loading: false,
@@ -371,13 +372,34 @@ function renderList() {
 
   if (state.loading === false && !state.entries.length) {
     if (!state.changes.length) {
-      list.appendChild(emptyState({
-        iconName: state.path ? 'folder' : 'commit',
-        title: state.path ? 'This folder is empty' : 'No files on this branch',
-        text: state.path ? 'Nothing has been committed at this path yet.' : 'Upload a file or create one to make the first commit.',
-        actionLabel: 'Upload files',
-        onAction: () => el('fileInput').click(),
-      }));
+      if (state.emptyRepo && !state.path) {
+        // First commit on a brand-new repository. Nothing is broken: there is
+        // simply no commit to read files from yet.
+        list.appendChild(h('div', { class: 'state' },
+          h('div', { class: 'state-ill' }, icon('commit')),
+          h('h2', { text: 'Brand-new repository' }),
+          h('p', { text: 'There are no commits yet. Anything you upload or create here becomes the first commit, and the default branch starts with it.' }),
+          h('button', {
+            class: 'btn btn-primary',
+            type: 'button',
+            onClick: () => el('fileInput').click(),
+          }, icon('upload'), h('span', { text: 'Upload the first file' })),
+          h('button', {
+            class: 'btn btn-soft',
+            type: 'button',
+            style: { marginTop: '8px' },
+            onClick: () => createNewFile(),
+          }, icon('plus'), h('span', { text: 'Create a file instead' })),
+        ));
+      } else {
+        list.appendChild(emptyState({
+          iconName: state.path ? 'folder' : 'commit',
+          title: state.path ? 'This folder is empty' : 'No files on this branch',
+          text: state.path ? 'Nothing has been committed at this path yet.' : 'Upload a file or create one to make the first commit.',
+          actionLabel: 'Upload files',
+          onAction: () => el('fileInput').click(),
+        }));
+      }
     }
     return;
   }
@@ -456,9 +478,17 @@ async function loadContents() {
   renderList();
   try {
     state.entries = await gh.listContents(state.repo.owner, state.repo.repo, state.path, state.branch);
+    state.emptyRepo = false;
   } catch (err) {
     state.entries = [];
-    if (!(err instanceof gh.GitHubError && err.status === 404)) {
+    // A repository with no commits answers 409 "empty" for contents reads; a
+    // missing path answers 404. Neither is worth an error toast — the empty
+    // state explains what to do next.
+    const benign = err instanceof gh.GitHubError
+      && (err.status === 404 || (err.status === 409 && /empty/i.test(err.details || err.message)));
+    if (benign) {
+      if (err.status === 409) state.emptyRepo = true;
+    } else {
       toastError(gh.describeError(err));
     }
   } finally {
@@ -493,6 +523,7 @@ async function refreshBranchFlag() {
   try {
     const sha = await gh.getRefSha(state.repo.owner, state.repo.repo, state.branch);
     state.branchIsNew = !sha;
+    state.emptyRepo = !sha ? await gh.isRepoEmpty(state.repo.owner, state.repo.repo) : false;
   } catch {
     state.branchIsNew = false;
   }
@@ -1200,8 +1231,15 @@ function openCommitSheet() {
 
   const body = h('div', {},
     state.branchIsNew ? banner('info', h('div', {},
-      h('b', { text: `Creates branch “${state.branch}”. ` }),
-      `It starts from ${state.repo.defaultBranch}.`,
+      state.emptyRepo
+        ? [
+            h('b', { text: 'This will be the first commit. ' }),
+            `It creates ${state.branch} and becomes the root of the repository.`,
+          ]
+        : [
+            h('b', { text: `Creates branch “${state.branch}”. ` }),
+            `It starts from ${state.repo.defaultBranch}.`,
+          ],
     )) : null,
     h('div', { class: 'field', style: { marginTop: '6px' } },
       h('div', { class: 'field-label' },
