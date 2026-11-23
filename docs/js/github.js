@@ -72,6 +72,11 @@ function rateLimitError(res, body) {
   return new RateLimitError(message, { status: res.status, url: res.url, details: body });
 }
 
+/** GitHub's wording for a repository with no commits at all. */
+function isEmptyRepoMessage(message) {
+  return /repository\s+is\s+empty/i.test(String(message || ''));
+}
+
 function errorFromResponse(res, body) {
   const msg = (body && typeof body === 'object' && (body.message || body.error_description || body.error)) || '';
   let message = msg || `GitHub returned ${res.status}`;
@@ -79,7 +84,13 @@ function errorFromResponse(res, body) {
   if (res.status === 401) message = 'Your token is invalid or was revoked. Sign in again.';
   else if (res.status === 403) message = msg || 'This token does not have permission for that action.';
   else if (res.status === 404) message = 'Not found — or this token cannot see that private repository.';
-  else if (res.status === 409) message = 'The branch changed while saving. Reload and try again.';
+  else if (res.status === 409) {
+    // GitHub answers 409 both for an empty repository ("Git Repository is
+    // empty.") and for some ref conflicts. Only the latter is about staleness.
+    message = isEmptyRepoMessage(msg)
+      ? 'This repository has no commits yet.'
+      : 'The branch changed while saving. Reload and try again.';
+  }
   else if (res.status === 422) message = msg || 'GitHub rejected that request (probably an invalid path or branch name).';
   return new GitHubError(message, { status: res.status, url: res.url, details: msg });
 }
@@ -290,14 +301,41 @@ export async function getFile(owner, repo, path, ref) {
 
 /* ---------------- writes ---------------- */
 
+/**
+ * Resolve a branch tip, or null when there is nothing to build on.
+ *
+ * "Nothing" has three different shapes on GitHub:
+ *   - 404 "Not Found"                — repo exists, branch does not
+ *   - 409 "Git Repository is empty." — no commits at all, so no refs either
+ *   - 200 with an empty object.sha   — seen on some empty repos
+ * All three mean the same thing to us: start from an empty tree.
+ */
 export async function getRefSha(owner, repo, branch) {
   try {
     const { data } = await api.get(`/repos/${owner}/${repo}/git/ref/heads/${encodeRef(branch)}`);
-    return data.object.sha;
+    const sha = data && data.object && data.object.sha;
+    // An empty repo may answer 200 with an empty sha instead of 409.
+    return typeof sha === 'string' && sha ? sha : null;
   } catch (err) {
-    if (err instanceof GitHubError && err.status === 404) return null;
+    if (!(err instanceof GitHubError)) throw err;
+    if (err.status === 404) return null;
+    if (err.status === 409 && isEmptyRepoMessage(err.details || err.message)) return null;
     throw err;
   }
+}
+
+/** True when the repository has no commits at all. */
+export async function isRepoEmpty(owner, repo) {
+  try {
+    // The branches listing answers [] on an empty repo, and is the cheapest
+    // reliable signal — ref reads there return 409 instead.
+    const { data } = await api.get(`/repos/${owner}/${repo}/branches?per_page=1`);
+    if (Array.isArray(data)) return data.length === 0;
+  } catch {
+    /* fall through to the ref probe */
+  }
+  const sha = await getRefSha(owner, repo, 'main');
+  return sha === null;
 }
 
 async function getCommit(owner, repo, sha) {
@@ -391,21 +429,90 @@ export async function commitChanges({
   if (!message || !message.trim()) throw new GitHubError('A commit message is required.');
 
   // 1. Where does the new commit sit? Never guess: read the head every time.
+  //
+  // On a repository with no commits, every ref read reports "empty" rather than
+  // "missing" — getRefSha normalises those to null. The first commit there has
+  // no parents and is built on an empty tree, so the branch can then be created
+  // pointing at it. That is the normal path for a brand-new repository.
   const currentHead = await getRefSha(owner, repo, branch);
   let baseSha = currentHead;
   let created = false;
 
   if (!baseSha) {
-    if (!createBranch) {
-      throw new GitHubError(`Branch “${branch}” does not exist yet.`, { status: 404 });
-    }
-    created = true;
-    // Start a new branch from the requested base, falling back to the default.
+    // A new commit on a fresh branch starts from the requested base, or from
+    // the default branch, or — if the repository has no commits at all — from
+    // nothing, in which case the first commit creates the branch.
     for (const candidate of [baseBranch, defaultBranch]) {
       if (!candidate || candidate === branch) continue;
       baseSha = await getRefSha(owner, repo, candidate);
       if (baseSha) break;
     }
+    if (!baseSha) {
+      const empty = await isRepoEmpty(owner, repo);
+      if (!empty) {
+        // The repository has history but this branch does not. If the caller
+        // asked for a new branch we already tried to branch off a base and
+        // failed, so there is genuinely nothing to build on: refuse rather
+        // than silently invent a root commit in the middle of a project.
+        throw new GitHubError(`Branch “${branch}” does not exist yet.`, { status: 404 });
+      }
+
+      // Brand-new repository: the Git Data API rejects every write until one
+      // commit exists, so seed the first file through the Contents API. That
+      // PUT creates the branch and the root commit; anything else rides on top
+      // in a second commit built with the normal path.
+      const [first, ...rest] = changes;
+      onProgress?.('Creating first commit…');
+      const seeded = await seedEmptyRepo({ owner, repo, branch, message, author, change: first });
+
+      if (!rest.length) {
+        return {
+          sha: seeded.sha,
+          htmlUrl: seeded.htmlUrl || `https://github.com/${owner}/${repo}`,
+          branch,
+          created: true,
+        };
+      }
+
+      // More files to write: extend the seed commit in one follow-up commit.
+      const seededHead = await getRefSha(owner, repo, branch);
+      const seededCommit = await getCommit(owner, repo, seededHead);
+
+      onProgress?.(rest.length > 1 ? `Uploading ${rest.length} files…` : 'Uploading…');
+      const extraEntries = [];
+      for (const change of rest) {
+        if (change.delete) {
+          extraEntries.push({ path: normalizePath(change.path), blobSha: null });
+          continue;
+        }
+        const bytes = change.bytes || new TextEncoder().encode(change.text ?? '');
+        const asText = typeof change.text === 'string' ? true : !isBinary(bytes);
+        extraEntries.push({
+          path: normalizePath(change.path),
+          blobSha: await createBlob(owner, repo, bytes, asText),
+        });
+      }
+
+      onProgress?.('Building tree…');
+      const treeSha = await createTree(owner, repo, extraEntries, seededCommit.tree.sha);
+      onProgress?.('Writing commit…');
+      const commit = await createCommit(owner, repo, {
+        message,
+        tree: treeSha,
+        parents: [seededHead],
+        author,
+      });
+      onProgress?.('Updating branch…');
+      await updateRef(owner, repo, branch, commit.sha, false);
+
+      return {
+        sha: commit.sha,
+        htmlUrl: `https://github.com/${owner}/${repo}/commit/${commit.sha}`,
+        branch,
+        created: true,
+      };
+    }
+    created = true;
   }
 
   const baseCommit = baseSha ? await getCommit(owner, repo, baseSha) : null;
@@ -451,6 +558,35 @@ export async function commitChanges({
     branch,
     created,
   };
+}
+
+/**
+ * Initialise a repository that has no commits.
+ *
+ * The Git Data API refuses *every* write on an empty repository with
+ * 409 "Git Repository is empty." — blobs and trees included. GitHub's docs
+ * point at the Contents API for this case: a single PUT creates the branch and
+ * the root commit, after which the normal blob/tree/commit path works.
+ *
+ * @returns {Promise<{sha: string, path: string}>} the new commit sha and the
+ *          path that was seeded (callers replace or keep it as they like).
+ */
+async function seedEmptyRepo({ owner, repo, branch, message, author, change }) {
+  const isDelete = change.delete;
+  if (isDelete) {
+    // Nothing to delete in an empty repository; treat as a no-op write.
+    throw new GitHubError('Nothing to commit — the repository has no commits yet.');
+  }
+  const bytes = change.bytes || new TextEncoder().encode(change.text ?? '');
+  const body = {
+    message,
+    content: bytesToBase64(bytes),
+    branch,
+  };
+  if (author && author.name && author.email) body.author = { name: author.name, email: author.email };
+  const { data } = await api.put(`/repos/${owner}/${repo}/contents/${encodePath(change.path)}`, body);
+  const commit = (data && data.commit) || {};
+  return { sha: commit.sha || '', path: change.path, htmlUrl: commit.html_url || '' };
 }
 
 function normalizePath(path) {

@@ -7,10 +7,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "python3 -m http.server 8000 --directory docs --bind 0.0.0.0",
-    "test": "node test/commit-api.test.mjs && node test/ui-flows.test.mjs",
+    "test": "node test/commit-api.test.mjs && node test/ui-flows.test.mjs && node test/empty-repo.test.mjs",
     "test:api": "node test/commit-api.test.mjs",
     "test:ui": "node test/ui-flows.test.mjs",
-    "inspect": "node test/inspect-screens.mjs"
+    "inspect": "node test/inspect-screens.mjs",
+    "test:empty": "node test/empty-repo.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^25.0.0"
