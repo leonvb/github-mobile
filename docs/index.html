@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src https://api.github.com; base-uri 'self'; form-action 'none'; object-src 'none'">
+<title>Pocket Commit</title>
+<meta name="description" content="Commit files to any GitHub repository from your phone. A tiny installable static app — your token never leaves your device.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0f14">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f8fa">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Commit">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/favicon-64.png" sizes="64x64" type="image/png">
+<link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+
+<!-- Icon sprite -->
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.2A1.7 1.7 0 0 1 4.7 5.5h3.9c.5 0 1 .2 1.3.6l1.1 1.2c.3.3.7.5 1.2.5H19.3A1.7 1.7 0 0 1 21 9.5v7.8a1.7 1.7 0 0 1-1.7 1.7H4.7A1.7 1.7 0 0 1 3 17.3Z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6.5 3h7.2L19 8.3V21H6.5Z"/><path d="M13.7 3v5.3H19"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.2"/><circle cx="9" cy="10" r="1.6"/><path d="M3.8 17.8 9 12.6l3.6 3.6 2.7-2.7 4.9 4.9"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 8.5 5 12l4 3.5"/><path d="M15 8.5 19 12l-4 3.5"/><path d="M13.3 5.5l-2.6 13"/></symbol>
+  <symbol id="i-markdown" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2.4"/><path d="M6.5 9v6"/><path d="M6.5 15l-1.7-2"/><path d="M6.5 15l1.7-2"/><path d="M10.5 15v-6l2.2 3 2.2-3v6"/><path d="M17.6 9v6"/><path d="M15.9 13.3 17.6 15l1.7-1.7"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="4.5" rx="1.4"/><path d="M4.8 9v9.3c0 .9.7 1.7 1.7 1.7h11c.9 0 1.7-.7 1.7-1.7V9"/><path d="M10 13h4"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16.5V4.5"/><path d="M7.2 9.3 12 4.5l4.8 4.8"/><path d="M4 16.5v2.2c0 .7.6 1.3 1.3 1.3h13.4c.7 0 1.3-.6 1.3-1.3v-2.2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12"/><path d="M7.2 11.2 12 16l4.8-4.8"/><path d="M4 19.5h16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9.5 7V4.8c0-.4.4-.8.8-.8h3.4c.4 0 .8.4.8.8V7"/><path d="M6.3 7l.9 12.2c0 .5.4.8.9.8h7.8c.5 0 .9-.3.9-.8L17.7 7"/><path d="M10.2 10.5v6M13.8 10.5v6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M9.8 14.2 14.2 9.8"/><path d="M11.1 6.7 13 4.8a3.6 3.6 0 0 1 5.1 5.1l-1.9 1.9"/><path d="M12.9 17.3 11 19.2a3.6 3.6 0 0 1-5.1-5.1l1.9-1.9"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4.2L20 8.2 15.8 4 4 15.8Z"/><path d="M13.4 6.4 17.6 10.6"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><path d="M6 3.8v12.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="6" r="2.4"/><path d="M18 8.4a7.2 7.2 0 0 1-7.2 7.2H6"/></symbol>
+  <symbol id="i-commit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><path d="M3.5 12H8.6M15.4 12h5.1"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 4.2 21 19.5H3Z"/><path d="M12 9.7v4.4"/><circle cx="12" cy="16.9" r=".9" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.8" y="10.3" width="14.4" height="10" rx="2"/><path d="M8.2 10.3V7.6a3.8 3.8 0 0 1 7.6 0v2.7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m20 20-4.6-4.6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.3 14.3A8.6 8.6 0 0 1 9.7 3.7a8.6 8.6 0 1 0 10.6 10.6Z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="1.8"/><path d="M9 20h6M12 16.5V20"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9.5 21H5.2A1.7 1.7 0 0 1 3.5 19.3V4.7A1.7 1.7 0 0 1 5.2 3h4.3"/><path d="m15.8 16.4 4.4-4.4-4.4-4.4"/><path d="M20.2 12H9.6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.2 11.2A8.3 8.3 0 1 0 18 17.6"/><path d="M20.4 5.2v6h-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5"/><circle cx="12" cy="8.1" r=".95" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8.2" cy="12" r="3.7"/><path d="M11.9 12H21M17.6 12v3.3M20.4 12v2.3"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M12 2.6a9.4 9.4 0 0 0-3 18.3c.5.1.6-.2.6-.5v-1.7c-2.6.6-3.1-1.2-3.1-1.2-.4-1.1-1-1.4-1-1.4-.9-.6 0-.6 0-.6.9.1 1.4 1 1.4 1 .8 1.4 2.2 1 2.7.8.1-.6.3-1 .6-1.3-2-.2-4.2-1-4.2-4.5 0-1 .4-1.8 1-2.5-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.7 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.6.6.7 1 1.6 1 2.5 0 3.5-2.2 4.3-4.2 4.5.4.3.7.9.7 1.8v2.6c0 .3.1.6.6.5A9.4 9.4 0 0 0 12 2.6Z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <button class="repo-switch" id="repoBtn" type="button">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" class="icon"><use href="#i-commit"/></svg></span>
+      <span class="repo-switch-text">
+        <span class="repo-switch-name" id="repoName">Pocket Commit</span>
+        <span class="repo-switch-sub" id="repoSub">Connect a repository</span>
+      </span>
+      <svg class="icon chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+    </button>
+    <button class="avatar-btn" id="accountBtn" type="button" aria-label="Account and settings">
+      <img id="avatarImg" alt="" hidden>
+      <span id="avatarFallback" class="avatar-fallback"><svg class="icon"><use href="#i-key"/></svg></span>
+    </button>
+  </header>
+
+  <div class="subbar" id="subbar" hidden>
+    <button class="chip" id="branchBtn" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-branch"/></svg>
+      <span class="chip-label" id="branchName">main</span>
+      <svg class="icon chev" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+    </button>
+    <nav class="crumbs" id="crumbs" aria-label="Repository path"></nav>
+  </div>
+
+  <main class="list" id="list" tabindex="-1"></main>
+
+  <div class="bottombar" id="bottombar" hidden>
+    <button class="btn btn-primary btn-block" id="changesBtn" type="button" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-commit"/></svg>
+      <span>Review &amp; commit</span>
+      <span class="pill" id="changesCount">0</span>
+    </button>
+    <div class="bottombar-row">
+      <button class="btn btn-soft" id="newFileBtn" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+        <span>New file</span>
+      </button>
+      <button class="btn btn-soft" id="uploadBtn" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>
+        <span>Upload</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Sheet stack -->
+<div class="sheet-root" id="sheetRoot"></div>
+<div class="toast-root" id="toastRoot" role="status" aria-live="polite"></div>
+
+<input type="file" id="fileInput" multiple hidden>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
