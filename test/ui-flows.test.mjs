@@ -247,5 +247,12 @@ console.log(`\n(extra checks)`);
 P.state.changes = [];
 P.render();
 
+/* ---- 8. CSS must not defeat [hidden] (author display rules otherwise win) ---- */
+const css = fs.readFileSync(ROOT + '/app.css', 'utf8');
+ok('[hidden] guard present in CSS', /\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(css));
+ok('bottombar hidden on welcome (no repo)', P.state.repo === null || P.state.repo === undefined
+  ? document.getElementById('bottombar').hasAttribute('hidden')
+  : true);
+
 console.log(`\n${passes.length} passed, ${fails.length} failed`);
 if (fails.length) { console.log('\nFAILURES:'); fails.forEach((f) => console.log('  ✗ ' + f)); process.exit(1); }
