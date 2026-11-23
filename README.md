@@ -144,6 +144,12 @@ null-sha deletions):
 `npm run inspect` prints the rendered DOM for the welcome, repo and staged
 screens, which is handy when changing markup.
 
+- `test/service-worker.test.mjs` — caching strategy. Runs `sw.js` under a fake
+  service worker environment and asserts the properties that make deploys
+  visible: network-first, revalidated fetches, cache only as an offline
+  fallback, old versions deleted on activate, and a hard-refresh escape hatch
+  in `boot.js`.
+
 ## Deploy to GitHub Pages
 
 The included workflow publishes `docs/` on every push to `main`:
@@ -163,9 +169,10 @@ docs/
   index.html              app shell, inline SVG icon sprite
   app.css                 design tokens, light/dark themes, sheets
   manifest.webmanifest    home-screen metadata
-  sw.js                   offline shell cache (never caches API calls)
+  sw.js                   network-first shell cache (never caches API calls)
   404.html                fallback that redirects to the app root
   js/
+    boot.js               service worker registration, update + hard refresh
     app.js                screens, editor, uploads, commit UI
     github.js             REST client, auth checks, atomic commit builder
     ui.js                 bottom sheets, toasts, form controls
@@ -176,6 +183,26 @@ test/                     jsdom suites + screen inspector
 .github/workflows/
   deploy-pages.yml        Pages deployment
 ```
+
+## Updates and the offline cache
+
+The app installs a service worker so it opens without a connection. That cache
+is the one thing that can make a fresh deploy invisible, so the strategy is
+deliberately conservative:
+
+- **Network-first.** Every same-origin asset is fetched from the network, with
+  `cache: 'no-cache'` so the HTTP cache cannot mask a deploy either. The cache
+  is only used when the network fails.
+- **The worker itself is versioned** (`VERSION` in `sw.js`). Changing it makes
+  browsers install the new worker, which deletes old caches on activation.
+- **`updateViaCache: 'none'`** stops a stale `sw.js` from hiding a release.
+- **Open pages reload once** when a new worker takes control, and the worker is
+  re-checked whenever the tab is brought back to the front.
+- **Account → Check for updates** clears the cache, unregisters the worker and
+  reloads. Use it if something looks stale.
+
+If you have an older version cached from before these rules existed, clear it
+once by hand: **Account → Check for updates**, or hard-reload the page.
 
 ## Limits worth knowing
 
