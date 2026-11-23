@@ -1,0 +1,21 @@
+{
+  "name": "pocket-commit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Commit files to any GitHub repository from your phone. A static, backend-free web app.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "python3 -m http.server 8000 --directory docs --bind 0.0.0.0",
+    "test": "node test/commit-api.test.mjs && node test/ui-flows.test.mjs",
+    "test:api": "node test/commit-api.test.mjs",
+    "test:ui": "node test/ui-flows.test.mjs",
+    "inspect": "node test/inspect-screens.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

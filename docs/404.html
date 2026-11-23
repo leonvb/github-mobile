@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found — Pocket Commit</title>
+<link rel="icon" href="/github-mobile/icons/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+  :root { color-scheme: dark light; }
+  body {
+    margin: 0; min-height: 100dvh;
+    display: grid; place-items: center;
+    background: #0b0f14; color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+    text-align: center;
+  }
+  @media (prefers-color-scheme: light) {
+    body { background: #f6f7f9; color: #0d1117; }
+    a { color: #1a7f37; }
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { color: #7d8b9c; margin: 0 0 20px; font-size: 14px; }
+  a {
+    display: inline-block;
+    padding: 11px 18px; border-radius: 12px;
+    background: #3fb950; color: #08130a;
+    text-decoration: none; font-weight: 620; font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Page not found</h1>
+    <p>Pocket Commit lives at the site root.</p>
+    <a href="/github-mobile/">Open Pocket Commit</a>
+  </main>
+  <script>
+    // Preserve the path so a deep link can be restored after the redirect.
+    (function () {
+      var base = '/github-mobile/';
+      var rest = location.pathname.replace(/^\/github-mobile\/?/, '');
+      var target = base + (rest && !rest.endsWith('/') ? '' : '') ;
+      if (location.pathname !== base && location.pathname !== base.replace(/\/$/, '')) {
+        document.querySelector('a').href = base;
+      }
+    })();
+  </script>
+</body>
+</html>
