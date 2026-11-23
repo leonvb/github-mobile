@@ -10,6 +10,7 @@ import {
   switchRow, banner, emptyState, skeletonList,
 } from './ui.js';
 
+const BUILD = '2026-11-23.3';
 const LARGE_UPLOAD = 12 * 1024 * 1024;
 const HARD_FILE_LIMIT = 90 * 1024 * 1024; // GitHub rejects blobs over 100 MB
 const EDITABLE_MAX = 4 * 1024 * 1024;
@@ -51,9 +52,6 @@ async function boot() {
     await refreshViewer({ restore: true });
   }
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
 }
 
 function bindEvents() {
@@ -260,6 +258,11 @@ function renderWelcome() {
     ),
     h('p', { class: 'help', style: { textAlign: 'center', margin: '20px 10px 0' } },
       'Add this page to your home screen — it runs full-screen, like an app.'),
+    h('p', {
+      class: 'help mono',
+      style: { textAlign: 'center', margin: '16px 10px 0', opacity: '.6', fontSize: '11px' },
+      text: `build ${BUILD}`,
+    }),
   );
 }
 
@@ -1663,10 +1666,40 @@ function openAccountSheet() {
   ));
 
   body.appendChild(h('div', { class: 'card tight' },
-    h('div', { class: 'kv' }, h('dt', { text: 'Version' }), h('dd', { text: '1.0.0' })),
+    h('div', { class: 'kv' }, h('dt', { text: 'Version' }), h('dd', { class: 'mono', text: BUILD })),
     h('div', { class: 'kv' }, h('dt', { text: 'Talks to' }), h('dd', { text: 'api.github.com' })),
     h('div', { class: 'kv' }, h('dt', { text: 'Third parties' }), h('dd', { text: 'None' })),
   ));
+
+  const updateBtn = h('button', {
+    class: 'btn btn-soft btn-block',
+    type: 'button',
+    style: { marginTop: '4px' },
+  }, icon('refresh'), h('span', { text: 'Check for updates' }));
+  updateBtn.addEventListener('click', async () => {
+    const label = updateBtn.querySelector('span');
+    updateBtn.disabled = true;
+    if (label) label.textContent = 'Checking…';
+    try {
+      // Ask the browser whether a newer worker is available; if the cache is
+      // stale, the hard reload below is what actually gets the new code.
+      const reg = await navigator.serviceWorker?.getRegistration?.();
+      if (reg) await reg.update();
+      if (typeof window.pocketCommitUpdate === 'function') {
+        await window.pocketCommitUpdate();
+      } else {
+        location.reload();
+      }
+    } catch {
+      location.reload();
+    }
+  });
+  body.appendChild(updateBtn);
+  body.appendChild(h('p', {
+    class: 'help',
+    style: { marginTop: '8px' },
+    text: 'Clears the offline cache, unregisters the service worker and reloads. Use it if a change you just deployed is not showing up.',
+  }));
 
   const sheet = openSheet({
     title: 'Account',
